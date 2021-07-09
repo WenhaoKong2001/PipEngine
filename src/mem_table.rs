@@ -16,9 +16,9 @@ pub struct MemTableEntry {
 }
 
 
-/// +-----------------------------+--------------+
+/// +-----------------------------+-------------+
 /// | BTreeMap<key,MemTableEntry> | size: usize |
-/// +----------------------------+--------------+
+/// +-----------------------------+-------------+
 pub struct MemTable {
     btree: BTreeMap<key, MemTableEntry>,
     size: usize,
