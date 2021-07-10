@@ -3,10 +3,10 @@ use crate::mem_table;
 use std::path::PathBuf;
 use std::io;
 
-pub struct db{
-    path:PathBuf,
-    disk:disk_service::disk_service,
-    mem_table:mem_table::MemTable,
+pub struct db {
+    path: PathBuf,
+    disk: disk_service::disk_service,
+    mem_table: mem_table::MemTable,
 }
 
 /*

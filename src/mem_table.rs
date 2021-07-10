@@ -1,6 +1,7 @@
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap};
 use std::collections::btree_map::Range;
 use std::ops::Bound::Included;
+
 pub const DEFAULT_MAX_MEMORABLE_SIZE: usize = 4096 * 4;
 
 type key = Vec<u8>;
@@ -8,6 +9,7 @@ type key = Vec<u8>;
 /// +--------------+------------------------+-----------------+---------------+
 /// | key: Vec<u8> | value: Option<Vec<u8>> | timestamp: u128 | deleted: bool |
 /// +--------------+------------------------+-----------------+---------------+
+#[derive(Clone)]
 pub struct MemTableEntry {
     key: key,
     value: Option<Vec<u8>>,
@@ -69,15 +71,34 @@ impl MemTable {
         self.btree.get(key)
     }
 
-    fn range(&self, min_key: &[u8], max_key: &[u8]){
-        let range = self.btree.range((Included(min_key.to_owned()),Included(max_key.to_owned())));
-
-        // for (key,value) in range{
-        //     println!("{}",value.timestamp);
-        // }
+    fn range(&self, min_key: &[u8], max_key: &[u8]) -> Vec<MemTableEntry> {
+        let range = self.btree.range((Included(min_key.to_owned()), Included(max_key.to_owned())));
+        let mut range_vec: Vec<MemTableEntry> = Vec::new();
+        for (key, entry) in range {
+            range_vec.push(entry.clone());
+        }
+        range_vec
     }
 
-    fn delete(&mut self, key: &[u8]) {}
+    fn delete(&mut self, key: &[u8], timestamp: u128) {
+        let entry = MemTableEntry {
+            key: key.to_owned(),
+            value: None,
+            timestamp,
+            deleted: true,
+        };
+
+        if self.btree.contains_key(key) {
+            let old_value = self.btree.get_mut(key).unwrap();
+            if let Some(value) = old_value.value.as_ref() {
+                self.size -= value.len();
+            }
+            *old_value = entry;
+        } else {
+            self.size += key.len() + 16 + 1;
+            self.btree.insert(key.to_vec(), entry);
+        }
+    }
 }
 
 mod test {
@@ -99,9 +120,12 @@ mod test {
         let value_c = table.get(b"c").unwrap();
 
         assert_eq!(value_a.value.as_ref().unwrap(), b"valueA-2");
-        assert_eq!(value_b.value.as_ref().unwrap(),b"valueB");
-        assert_eq!(value_c.value.as_ref().unwrap(),b"valueC-2");
-        table.range(b"a",b"c");
+        assert_eq!(value_b.value.as_ref().unwrap(), b"valueB");
+        assert_eq!(value_c.value.as_ref().unwrap(), b"valueC-2");
+        let a = table.range(b"a", b"c");
+        for aa in &a {
+            println!("{}", aa.timestamp);
+        }
     }
 }
 

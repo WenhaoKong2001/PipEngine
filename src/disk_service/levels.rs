@@ -1,4 +1,1 @@
-
-struct level{
-
-}
+struct level {}
