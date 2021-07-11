@@ -314,8 +314,6 @@ mod tests{
 
         let (new_wal, new_mem_table) = WAL::recover(&path).unwrap();
 
-        println!("{}",new_mem_table.get(b"a").unwrap().timestamp);
-
         let file = OpenOptions::new().read(true).open(&new_wal.path).unwrap();
         let mut reader = BufReader::new(file);
 
