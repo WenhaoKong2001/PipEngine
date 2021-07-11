@@ -11,10 +11,10 @@ type key = Vec<u8>;
 /// +--------------+------------------------+-----------------+---------------+
 #[derive(Clone)]
 pub struct MemTableEntry {
-    key: key,
-    value: Option<Vec<u8>>,
-    timestamp: u128,
-    deleted: bool,
+    pub key: key,
+    pub value: Option<Vec<u8>>,
+    pub timestamp: u128,
+    pub deleted: bool,
 }
 
 
@@ -101,7 +101,8 @@ impl MemTable {
     }
 }
 
-mod test {
+#[cfg(test)]
+mod tests {
     use std::collections::BTreeMap;
     use super::key;
     use crate::mem_table::MemTable;

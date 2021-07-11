@@ -17,7 +17,7 @@ pub struct WAL {
 }
 
 impl WAL {
-    fn new(dir: PathBuf) -> io::Result<WAL> {
+    fn new(dir: &PathBuf) -> io::Result<WAL> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -44,7 +44,7 @@ impl WAL {
         })
     }
 
-    fn recover(dir: PathBuf) -> io::Result<(WAL, MemTable)> {
+    fn recover(dir: &PathBuf) -> io::Result<(WAL, MemTable)> {
         let mut wal_path = PathBuf::new();
         let dir_entry = fs::read_dir(&dir)?;
         for entry in dir_entry {
@@ -56,7 +56,7 @@ impl WAL {
         }
 
         let mut new_mem_table = MemTable::new();
-        let mut new_wal = WAL::new(dir).unwrap();
+        let mut new_wal = WAL::new(&dir).unwrap();
         if let Ok(wal) = WAL::from_path(&wal_path) {
             for wal_entry in wal.into_iter() {
                 if wal_entry.deleted {
@@ -71,7 +71,7 @@ impl WAL {
             }
         }
         new_wal.writer.flush().unwrap();
-        fs::remove_dir(wal_path).unwrap();
+        fs::remove_file(wal_path).unwrap();
 
         Ok((new_wal,new_mem_table))
     }
@@ -169,5 +169,165 @@ impl Iterator for WALIterator {
             timestamp,
             deleted,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests{
+    use std::io::{BufReader, Read, Write};
+    use std::fs::{File, OpenOptions};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use crate::disk_service::wal::WAL;
+    use std::path::PathBuf;
+
+    fn check_entry(
+        reader: &mut BufReader<File>,
+        key: &[u8],
+        value: Option<&[u8]>,
+        timestamp: u128,
+        deleted: bool,
+    ) {
+        let mut len_buffer = [0; 8];
+        reader.read_exact(&mut len_buffer).unwrap();
+        let file_key_len = usize::from_le_bytes(len_buffer);
+        assert_eq!(file_key_len, key.len());
+
+        let mut bool_buffer = [0; 1];
+        reader.read_exact(&mut bool_buffer).unwrap();
+        let file_deleted = bool_buffer[0] != 0;
+        assert_eq!(file_deleted, deleted);
+
+        if deleted {
+            let mut file_key = vec![0; file_key_len];
+            reader.read_exact(&mut file_key).unwrap();
+            assert_eq!(file_key, key);
+        } else {
+            reader.read_exact(&mut len_buffer).unwrap();
+            let file_value_len = usize::from_le_bytes(len_buffer);
+            assert_eq!(file_value_len, value.unwrap().len());
+            let mut file_key = vec![0; file_key_len];
+            reader.read_exact(&mut file_key).unwrap();
+            assert_eq!(file_key, key);
+            let mut file_value = vec![0; file_value_len];
+            reader.read_exact(&mut file_value).unwrap();
+            assert_eq!(file_value, value.unwrap());
+        }
+
+        let mut timestamp_buffer = [0; 16];
+        reader.read_exact(&mut timestamp_buffer).unwrap();
+        let file_timestamp = u128::from_le_bytes(timestamp_buffer);
+        assert_eq!(file_timestamp, timestamp);
+    }
+
+    #[test]
+    fn test_put(){
+        let path = PathBuf::from(format!("./{}","WAL"));
+        fs::create_dir(&path);
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_micros();
+
+        let test_value:Vec<(&[u8],Option<&[u8]>)> =vec![
+            (b"a",Some(b"value_a")),
+            (b"b",Some(b"value_b")),
+            (b"a",Some(b"value_a2")),
+            (b"c",Some(b"value_c")),
+        ];
+
+        let mut wal = WAL::new(&path).unwrap();
+
+        for val in test_value.iter(){
+            wal.put(val.0,val.1.unwrap(),timestamp).unwrap();
+        }
+        wal.writer.flush().unwrap();
+
+        let file = OpenOptions::new().read(true).open(&wal.path).unwrap();
+        let mut reader = BufReader::new(file);
+
+        for val in test_value.iter(){
+            check_entry(&mut reader, val.0, val.1, timestamp, false);
+        }
+
+        fs::remove_dir_all(&path).unwrap();
+    }
+
+    #[test]
+    fn test_delete(){
+        let path = PathBuf::from(format!("./{}","WAL"));
+        fs::create_dir(&path);
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_micros();
+
+        let test_value:Vec<(&[u8],Option<&[u8]>)> =vec![
+            (b"a",Some(b"value_a")),
+            (b"b",Some(b"value_b")),
+            (b"a",Some(b"value_a2")),
+            (b"c",Some(b"value_c")),
+        ];
+        let mut wal = WAL::new(&path).unwrap();
+        for val in test_value.iter(){
+            wal.delete(val.0,timestamp);
+        }
+        wal.writer.flush().unwrap();
+
+        let file = OpenOptions::new().read(true).open(&wal.path).unwrap();
+        let mut reader = BufReader::new(file);
+
+        for val in test_value.iter(){
+            check_entry(&mut reader, val.0, None, timestamp, true);
+        }
+
+        fs::remove_dir_all(&path).unwrap();
+    }
+
+    // Notice:
+    // (b"a",Some(b"value_a")),
+    // (b"b",Some(b"value_b")),
+    // (b"a",Some(b"value_a2")),
+    // (b"c",Some(b"value_c")),
+    // can't pass this test.
+    // but it behaves as the desired behavior.
+    // The reason for this is that test_read_wal test the given value one by one
+    // But the internal Btree will rewrite it's value when encounter the same key.
+    #[test]
+    fn test_read_wal(){
+        let path = PathBuf::from(format!("./{}","WAL"));
+        fs::create_dir(&path);
+
+        let test_value:Vec<(&[u8],Option<&[u8]>)> =vec![
+            (b"Apple", Some(b"Apple Smoothie")),
+            (b"Lime", Some(b"Lime Smoothie")),
+            (b"Orange", Some(b"Orange Smoothie")),
+        ];
+
+        let mut wal = WAL::new(&path).unwrap();
+        for (i,val) in test_value.iter().enumerate(){
+            wal.put(val.0,val.1.unwrap(),i as u128).unwrap();
+        }
+        wal.writer.flush().unwrap();
+
+        let (new_wal, new_mem_table) = WAL::recover(&path).unwrap();
+
+        println!("{}",new_mem_table.get(b"a").unwrap().timestamp);
+
+        let file = OpenOptions::new().read(true).open(&new_wal.path).unwrap();
+        let mut reader = BufReader::new(file);
+
+        for (i, e) in test_value.iter().enumerate() {
+            check_entry(&mut reader, e.0, e.1, i as u128, false);
+
+            let mem_e = new_mem_table.get(e.0).unwrap();
+            assert_eq!(mem_e.key, e.0);
+            assert_eq!(mem_e.value.as_ref().unwrap().as_slice(), e.1.unwrap());
+            assert_eq!(mem_e.timestamp, i as u128);
+        }
+
+        fs::remove_dir_all(&path).unwrap();
     }
 }
