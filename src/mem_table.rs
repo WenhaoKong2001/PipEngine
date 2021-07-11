@@ -27,14 +27,14 @@ pub struct MemTable {
 }
 
 impl MemTable {
-    fn new() -> MemTable {
+    pub fn new() -> MemTable {
         MemTable {
             btree: BTreeMap::new(),
             size: 0,
         }
     }
 
-    fn put(&mut self, key: &[u8], value: &[u8], timestamp: u128) {
+    pub fn put(&mut self, key: &[u8], value: &[u8], timestamp: u128) {
         let entry = MemTableEntry {
             key: key.to_owned(),
             value: Some(value.to_owned()),
@@ -67,11 +67,11 @@ impl MemTable {
         }
     }
 
-    fn get(&self, key: &[u8]) -> Option<&MemTableEntry> {
+    pub fn get(&self, key: &[u8]) -> Option<&MemTableEntry> {
         self.btree.get(key)
     }
 
-    fn range(&self, min_key: &[u8], max_key: &[u8]) -> Vec<MemTableEntry> {
+    pub fn range(&self, min_key: &[u8], max_key: &[u8]) -> Vec<MemTableEntry> {
         let range = self.btree.range((Included(min_key.to_owned()), Included(max_key.to_owned())));
         let mut range_vec: Vec<MemTableEntry> = Vec::new();
         for (key, entry) in range {
@@ -80,7 +80,7 @@ impl MemTable {
         range_vec
     }
 
-    fn delete(&mut self, key: &[u8], timestamp: u128) {
+    pub fn delete(&mut self, key: &[u8], timestamp: u128) {
         let entry = MemTableEntry {
             key: key.to_owned(),
             value: None,
