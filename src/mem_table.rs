@@ -2,9 +2,9 @@ use std::collections::{BTreeMap};
 use std::collections::btree_map::Range;
 use std::ops::Bound::Included;
 
-pub const DEFAULT_MAX_MEMORABLE_SIZE: usize = 4096 * 4;
-
 type key = Vec<u8>;
+
+const MAX_MEM_TABLE_SIZE: usize = 4096;
 
 /// +--------------+------------------------+-----------------+---------------+
 /// | key: Vec<u8> | value: Option<Vec<u8>> | timestamp: u128 | deleted: bool |
@@ -99,7 +99,12 @@ impl MemTable {
             self.btree.insert(key.to_vec(), entry);
         }
     }
+
+    pub fn is_over_weight(&self) -> bool {
+        self.size >= MAX_MEM_TABLE_SIZE
+    }
 }
+
 
 #[cfg(test)]
 mod tests {

@@ -37,9 +37,7 @@ impl WAL {
 
     //todo when current mem_table is full,it need to be written to a db file.
     // at the same time current wal need to be deleted and fresh.
-    pub fn fresh(&mut self){
-
-    }
+    pub fn fresh(&mut self) {}
 
     fn from_path(path: &PathBuf) -> io::Result<WAL> {
         let file = OpenOptions::new().append(true).create(true).open(path)?;
@@ -50,7 +48,7 @@ impl WAL {
         })
     }
 
-    fn recover(dir: &PathBuf) -> io::Result<(WAL, MemTable)> {
+    pub fn recover(dir: &PathBuf) -> io::Result<(WAL, MemTable)> {
         let mut wal_path = PathBuf::new();
         let dir_entry = fs::read_dir(&dir)?;
         for entry in dir_entry {
@@ -79,7 +77,7 @@ impl WAL {
         new_wal.writer.flush().unwrap();
         fs::remove_file(wal_path).unwrap();
 
-        Ok((new_wal,new_mem_table))
+        Ok((new_wal, new_mem_table))
     }
 
     pub fn put(&mut self, key: &[u8], value: &[u8], timestamp: u128) -> io::Result<()> {
@@ -179,7 +177,7 @@ impl Iterator for WALIterator {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use std::io::{BufReader, Read, Write};
     use std::fs::{File, OpenOptions};
     use std::fs;
@@ -227,8 +225,8 @@ mod tests{
     }
 
     #[test]
-    fn test_put(){
-        let path = PathBuf::from(format!("./{}","WAL"));
+    fn test_put() {
+        let path = PathBuf::from(format!("./{}", "WAL"));
         fs::create_dir(&path);
 
         let timestamp = SystemTime::now()
@@ -236,24 +234,24 @@ mod tests{
             .unwrap()
             .as_micros();
 
-        let test_value:Vec<(&[u8],Option<&[u8]>)> =vec![
-            (b"a",Some(b"value_a")),
-            (b"b",Some(b"value_b")),
-            (b"a",Some(b"value_a2")),
-            (b"c",Some(b"value_c")),
+        let test_value: Vec<(&[u8], Option<&[u8]>)> = vec![
+            (b"a", Some(b"value_a")),
+            (b"b", Some(b"value_b")),
+            (b"a", Some(b"value_a2")),
+            (b"c", Some(b"value_c")),
         ];
 
         let mut wal = WAL::new(&path).unwrap();
 
-        for val in test_value.iter(){
-            wal.put(val.0,val.1.unwrap(),timestamp).unwrap();
+        for val in test_value.iter() {
+            wal.put(val.0, val.1.unwrap(), timestamp).unwrap();
         }
         wal.writer.flush().unwrap();
 
         let file = OpenOptions::new().read(true).open(&wal.path).unwrap();
         let mut reader = BufReader::new(file);
 
-        for val in test_value.iter(){
+        for val in test_value.iter() {
             check_entry(&mut reader, val.0, val.1, timestamp, false);
         }
 
@@ -261,8 +259,8 @@ mod tests{
     }
 
     #[test]
-    fn test_delete(){
-        let path = PathBuf::from(format!("./{}","WAL"));
+    fn test_delete() {
+        let path = PathBuf::from(format!("./{}", "WAL"));
         fs::create_dir(&path);
 
         let timestamp = SystemTime::now()
@@ -270,22 +268,22 @@ mod tests{
             .unwrap()
             .as_micros();
 
-        let test_value:Vec<(&[u8],Option<&[u8]>)> =vec![
-            (b"a",Some(b"value_a")),
-            (b"b",Some(b"value_b")),
-            (b"a",Some(b"value_a2")),
-            (b"c",Some(b"value_c")),
+        let test_value: Vec<(&[u8], Option<&[u8]>)> = vec![
+            (b"a", Some(b"value_a")),
+            (b"b", Some(b"value_b")),
+            (b"a", Some(b"value_a2")),
+            (b"c", Some(b"value_c")),
         ];
         let mut wal = WAL::new(&path).unwrap();
-        for val in test_value.iter(){
-            wal.delete(val.0,timestamp);
+        for val in test_value.iter() {
+            wal.delete(val.0, timestamp);
         }
         wal.writer.flush().unwrap();
 
         let file = OpenOptions::new().read(true).open(&wal.path).unwrap();
         let mut reader = BufReader::new(file);
 
-        for val in test_value.iter(){
+        for val in test_value.iter() {
             check_entry(&mut reader, val.0, None, timestamp, true);
         }
 
@@ -302,19 +300,19 @@ mod tests{
     // The reason for this is that test_read_wal only tests the given value one by one
     // But the internal Btree will rewrite it's value when encounter the same key.
     #[test]
-    fn test_read_wal(){
-        let path = PathBuf::from(format!("./{}","WAL"));
+    fn test_read_wal() {
+        let path = PathBuf::from(format!("./{}", "WAL"));
         fs::create_dir(&path);
 
-        let test_value:Vec<(&[u8],Option<&[u8]>)> =vec![
+        let test_value: Vec<(&[u8], Option<&[u8]>)> = vec![
             (b"Apple", Some(b"Apple Smoothie")),
             (b"Lime", Some(b"Lime Smoothie")),
             (b"Orange", Some(b"Orange Smoothie")),
         ];
 
         let mut wal = WAL::new(&path).unwrap();
-        for (i,val) in test_value.iter().enumerate(){
-            wal.put(val.0,val.1.unwrap(),i as u128).unwrap();
+        for (i, val) in test_value.iter().enumerate() {
+            wal.put(val.0, val.1.unwrap(), i as u128).unwrap();
         }
         wal.writer.flush().unwrap();
 
