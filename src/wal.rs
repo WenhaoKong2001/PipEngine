@@ -17,7 +17,7 @@ pub struct WAL {
 }
 
 impl WAL {
-    fn new(dir: &PathBuf) -> io::Result<WAL> {
+    pub fn new(dir: &PathBuf) -> io::Result<WAL> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -33,6 +33,12 @@ impl WAL {
             path,
             writer,
         })
+    }
+
+    //todo when current mem_table is full,it need to be written to a db file.
+    // at the same time current wal need to be deleted and fresh.
+    pub fn fresh(&mut self){
+
     }
 
     fn from_path(path: &PathBuf) -> io::Result<WAL> {
@@ -178,7 +184,7 @@ mod tests{
     use std::fs::{File, OpenOptions};
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
-    use crate::disk_service::wal::WAL;
+    use crate::wal::WAL;
     use std::path::PathBuf;
 
     fn check_entry(
@@ -293,7 +299,7 @@ mod tests{
     // (b"c",Some(b"value_c")),
     // can't pass this test.
     // but it behaves as the desired behavior.
-    // The reason for this is that test_read_wal test the given value one by one
+    // The reason for this is that test_read_wal only tests the given value one by one
     // But the internal Btree will rewrite it's value when encounter the same key.
     #[test]
     fn test_read_wal(){
