@@ -14,9 +14,9 @@ pub struct DiskService {
     dir: PathBuf,
     files: Vec<FileService>,
 }
-
+//TODO range get compression
 impl DiskService {
-    //todo creat DISK_FILE dir
+
     pub fn new(dir: &PathBuf) -> io::Result<DiskService> {
         fs::create_dir(dir);
         Ok(DiskService {
@@ -125,11 +125,18 @@ struct FileService {
 }
 
 impl FileService {
-    fn rebuild_mem_table_from_disk(&mut self) {
-        for entry in self.iter(){
-
+    fn rebuild_mem_table_from_disk(&mut self) -> MemTable {
+        let mut new_mem_table = MemTable::new();
+        for entry in self.iter() {
+            if entry.deleted {
+                new_mem_table.delete(entry.key.as_slice(), entry.timestamp);
+            } else {
+                new_mem_table.put(entry.key.as_slice()
+                                  , entry.value.as_ref().unwrap()
+                                  , entry.timestamp);
+            }
         }
-
+        new_mem_table
     }
 
     fn iter(&self) -> DBFIterator {
