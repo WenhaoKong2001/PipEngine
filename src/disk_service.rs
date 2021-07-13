@@ -50,7 +50,6 @@ impl DiskService {
                     min_key,
                     max_key,
                     file_path: path,
-                    reader,
                 });
             }
         }
@@ -112,7 +111,6 @@ impl DiskService {
             min_key: min.to_owned(),
             max_key: max.to_owned(),
             file_path: path,
-            reader,
         });
         Ok(())
     }
@@ -124,23 +122,153 @@ struct FileService {
     min_key: Vec<u8>,
     max_key: Vec<u8>,
     file_path: PathBuf,
-    reader: BufReader<File>,
 }
 
 impl FileService {
-    //fn new() -> FileService {}
-}
+    fn rebuild_mem_table_from_disk(&mut self) {
+        for entry in self.iter(){
 
-impl Iterator for FileService {
-    type Item = MemTable;
-
-    fn next(&mut self) -> Option<MemTable> {
-        let mut key_len_buf = [0;8];
-        if self.reader.read_exact(&mut ley_len_buf).is_err(){
-            return None;
         }
-        let key_size = usize::from_le_bytes(key_len_buf);
 
-        None
+    }
+
+    fn iter(&self) -> DBFIterator {
+        DBFIterator::new(self.file_path.to_owned(),
+                         (8 + 8 + self.min_size + self.max_size)).unwrap()
     }
 }
+
+impl IntoIterator for FileService {
+    type Item = MemTableEntry;
+    type IntoIter = DBFIterator;
+
+    fn into_iter(self) -> DBFIterator {
+        DBFIterator::new(self.file_path, (8 + 8 + self.min_size + self.max_size)).unwrap()
+    }
+}
+
+
+pub struct DBFIterator {
+    reader: BufReader<File>,
+}
+
+impl DBFIterator {
+    pub fn new(path: PathBuf, pos: usize) -> io::Result<DBFIterator> {
+        let file = OpenOptions::new().read(true).open(path)?;
+        let mut reader = BufReader::new(file);
+        reader.seek(SeekFrom::Start(pos as u64));
+        Ok(DBFIterator {
+            reader
+        })
+    }
+}
+
+impl Iterator for DBFIterator {
+    type Item = MemTableEntry;
+
+    fn next(&mut self) -> Option<MemTableEntry> {
+        let mut key_len_buf = [0; 8];
+        if self.reader.read_exact(&mut key_len_buf).is_err() {
+            return None;
+        }
+        let key_len = usize::from_le_bytes(key_len_buf);
+
+        let mut tombstone = [0; 1];
+        if self.reader.read_exact(&mut tombstone).is_err() {
+            return None;
+        }
+        let deleted = tombstone[0] != 0;
+        let mut key = vec![0; key_len];
+        let mut value = None;
+        if deleted {
+            //let mut key = vec![0; key_len];
+            if self.reader.read_exact(&mut key).is_err() {
+                return None;
+            }
+        } else {
+            let mut value_size_buf = [0; 8];
+            if self.reader.read_exact(&mut value_size_buf).is_err() {
+                return None;
+            }
+            let value_len = usize::from_le_bytes(value_size_buf);
+
+            //let mut key = vec![0; key_len];
+            if self.reader.read_exact(&mut key).is_err() {
+                return None;
+            }
+
+            let mut value_buf = vec![0; value_len];
+            if self.reader.read_exact(&mut value_buf).is_err() {
+                return None;
+            }
+            value = Some(value_buf);
+        }
+        let mut timestamp_buf = [0; 16];
+        if self.reader.read_exact(&mut timestamp_buf).is_err() {
+            return None;
+        }
+        let timestamp = u128::from_le_bytes(timestamp_buf);
+        Some(MemTableEntry {
+            key,
+            value,
+            timestamp,
+            deleted,
+        })
+    }
+}
+
+
+//
+// impl Iterator for FileService {
+//     type Item = MemTableEntry;
+//
+//     ///reset_pos need be called before calling next();
+//     fn next(&mut self) -> Option<MemTableEntry> {
+//         let mut key_len_buf = [0; 8];
+//         if self.reader.read_exact(&mut key_len_buf).is_err() {
+//             return None;
+//         }
+//         let key_size = usize::from_le_bytes(key_len_buf);
+//         let mut tombstone = [0; 1];
+//         if self.reader.read_exact(&mut tombstone).is_err() {
+//             return None;
+//         }
+//         let deleted = tombstone[0] != 0;
+//         let mut key = vec![0; key_size];
+//         let mut value = None;
+//         if deleted {
+//             if self.reader.read_exact(&mut key).is_err() {
+//                 return None;
+//             }
+//         } else {
+//             let mut value_size_buf = [0; 8];
+//             if self.reader.read_exact(&mut value_size_buf).is_err() {
+//                 return None;
+//             }
+//             let value_len = usize::from_le_bytes(value_size_buf);
+//
+//             //let mut key = vec![0; key_len];
+//             if self.reader.read_exact(&mut key).is_err() {
+//                 return None;
+//             }
+//
+//             let mut value_buf = vec![0; value_len];
+//             if self.reader.read_exact(&mut value_buf).is_err() {
+//                 return None;
+//             }
+//             value = Some(value_buf);
+//         }
+//
+//         let mut timestamp_buf = [0; 16];
+//         if self.reader.read_exact(&mut timestamp_buf).is_err() {
+//             return None;
+//         }
+//         let timestamp = u128::from_le_bytes(timestamp_buf);
+//         Some(MemTableEntry {
+//             key,
+//             value,
+//             timestamp,
+//             deleted,
+//         })
+//     }
+// }
