@@ -1,8 +1,6 @@
 use std::collections::{BTreeMap};
-use std::collections::btree_map::Range;
+use std::collections::btree_map::{Range, Iter};
 use std::ops::Bound::Included;
-
-type key = Vec<u8>;
 
 const MAX_MEM_TABLE_SIZE: usize = 4096;
 
@@ -11,7 +9,7 @@ const MAX_MEM_TABLE_SIZE: usize = 4096;
 /// +--------------+------------------------+-----------------+---------------+
 #[derive(Clone)]
 pub struct MemTableEntry {
-    pub key: key,
+    pub key: Vec<u8>,
     pub value: Option<Vec<u8>>,
     pub timestamp: u128,
     pub deleted: bool,
@@ -22,7 +20,7 @@ pub struct MemTableEntry {
 /// | BTreeMap<key,MemTableEntry> | size: usize |
 /// +-----------------------------+-------------+
 pub struct MemTable {
-    btree: BTreeMap<key, MemTableEntry>,
+    btree: BTreeMap<Vec<u8>, MemTableEntry>,
     size: usize,
 }
 
@@ -101,7 +99,20 @@ impl MemTable {
     }
 
     pub fn is_over_weight(&self) -> bool {
-        self.size >= MAX_MEM_TABLE_SIZE
+        self.size >= 128
+    }
+
+    pub fn clear(&mut self) {
+        self.btree.clear();
+        self.size = 0;
+    }
+
+    pub fn is_empty(& self)->bool{
+        self.btree.is_empty()
+    }
+
+    pub fn iter(&self) -> Iter<'_, Vec<u8>, MemTableEntry> {
+        self.btree.iter()
     }
 }
 
@@ -109,7 +120,7 @@ impl MemTable {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use super::key;
+    //use super::key;
     use crate::mem_table::MemTable;
 
     #[test]

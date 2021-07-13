@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::io::{self, BufReader, Read, BufWriter, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::mem_table::MemTable;
+use crate::util;
 
 pub struct WALEntry {
     key: Vec<u8>,
@@ -16,12 +17,10 @@ pub struct WAL {
     writer: BufWriter<File>,
 }
 
+
 impl WAL {
     pub fn new(dir: &PathBuf) -> io::Result<WAL> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_micros();
+        let timestamp = util::get_timestamp();
         let path = dir.join(timestamp.to_string() + ".wal");
         let file = OpenOptions::new()
             .write(true)
@@ -37,7 +36,21 @@ impl WAL {
 
     //todo when current mem_table is full,it need to be written to a db file.
     // at the same time current wal need to be deleted and fresh.
-    pub fn fresh(&mut self) {}
+    pub fn fresh(&mut self) -> io::Result<()> {
+        let dir = self.path.parent().unwrap();
+        fs::remove_file(&self.path)?;
+        let timestamp = util::get_timestamp();
+        let path = dir.join(timestamp.to_string() + ".wal");
+        let file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(&path)?;
+        let writer = BufWriter::new(file);
+        self.writer = writer;
+        self.path = path;
+        Ok(())
+    }
 
     fn from_path(path: &PathBuf) -> io::Result<WAL> {
         let file = OpenOptions::new().append(true).create(true).open(path)?;

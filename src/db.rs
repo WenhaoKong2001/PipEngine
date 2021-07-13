@@ -7,7 +7,7 @@ use std::io;
 use std::fs::OpenOptions;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::wal::WAL;
-
+use crate::util;
 
 struct db {
     dir_db: PathBuf,
@@ -19,7 +19,7 @@ struct db {
 impl db {
     pub fn new() -> io::Result<db> {
         let dir_db = PathBuf::from(format!("./{}", "DB"));
-        let dir_file = dir_db.join("FILE");
+        let dir_file = dir_db.join("DISK_FILE");
         let dir_wal = dir_db.join("WAL");
 
         fs::create_dir(&dir_db)?;
@@ -37,13 +37,16 @@ impl db {
     }
 
     pub fn put(&mut self, key: &str, value: &str) {
-        let timestamp = self.get_timestamp();
+        let timestamp = util::get_timestamp();
         self.wal.put(key.as_bytes(), value.as_bytes(), timestamp);
         self.mem_table.put(key.as_bytes(), value.as_bytes(), timestamp);
         //todo if mem_table.size > max_size
         if self.mem_table.is_over_weight() {
             //write mem_table to disk.
             //fresh wal.
+            self.disk_service.write_mem_table_to_disk(&mut self.mem_table);
+            self.mem_table.clear();
+            self.wal.fresh();
         }
     }
 
@@ -62,7 +65,7 @@ impl db {
     }
 
     pub fn delete(&mut self, key: &str) {
-        let timestamp = self.get_timestamp();
+        let timestamp = util::get_timestamp();
         self.wal.delete(key.as_bytes(), timestamp).unwrap();
         self.mem_table.delete(key.as_bytes(), timestamp);
     }
@@ -84,7 +87,7 @@ impl db {
 
     pub fn open(path: &PathBuf) -> io::Result<db> {
         let dir_db = PathBuf::from(path);
-        let dir_file = dir_db.join("FILE");
+        let dir_file = dir_db.join("DISK_FILE");
         let dir_wal = dir_db.join("WAL");
 
         if !dir_file.exists() || !dir_wal.exists() {
@@ -119,9 +122,6 @@ impl db {
         }
     }
 
-    fn get_timestamp(&self) -> u128 {
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros()
-    }
 }
 
 #[cfg(test)]
@@ -131,8 +131,7 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn test_put_get_range() {
-        let mut handler_db = db::new().unwrap();
+    fn test_put_get_range() {        let mut handler_db = db::new().unwrap();
         handler_db.put("a", "value-a");
         handler_db.put("b", "value-b");
         handler_db.put("a", "value-a2");
@@ -155,6 +154,12 @@ mod tests {
             assert_eq!(val, test_iter.next().unwrap())
             //println!("{}",val);
         }
+
+        handler_db.put("e", "value-e");
+        handler_db.put("f", "value-f");
+        handler_db.put("g", "value-g");
+        handler_db.put("h", "value-h");
+
         fs::remove_dir_all(handler_db.dir_db);
     }
 
