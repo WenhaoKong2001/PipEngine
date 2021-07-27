@@ -143,6 +143,7 @@ impl Iterator for WALIterator {
         if self.reader.read_exact(&mut key_len_buf).is_err() {
             return None;
         }
+
         let key_len = usize::from_le_bytes(key_len_buf);
 
         let mut tombstone = [0; 1];
