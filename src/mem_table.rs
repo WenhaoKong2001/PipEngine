@@ -144,6 +144,25 @@ mod tests {
             println!("{}", aa.timestamp);
         }
     }
+
+    #[test]
+    fn test_range() {
+        let mut table = MemTable::new();
+        table.put(b"a", b"valueA", 1);
+        table.put(b"a", b"valueA-2", 2);
+        table.put(b"b", b"valueB", 3);
+        table.put(b"c", b"valueC", 4);
+        table.put(b"c", b"valueC-2", 5);
+
+        let value_a = table.get(b"a").unwrap();
+        let value_b = table.get(b"b").unwrap();
+        let value_c = table.get(b"c").unwrap();
+
+        let a = table.range(b"a", b"c");
+        for aa in &a {
+            println!("{}", aa.timestamp);
+        }
+    }
 }
 
 

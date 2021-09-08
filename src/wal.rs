@@ -34,7 +34,7 @@ impl WAL {
         })
     }
 
-    //todo when current mem_table is full,it need to be written to a db file.
+    // todo when current mem_table is full,it need to be written to a db file.
     // at the same time current wal need to be deleted and fresh.
     pub fn fresh(&mut self) -> io::Result<()> {
         let dir = self.path.parent().unwrap();
