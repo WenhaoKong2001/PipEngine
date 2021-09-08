@@ -17,49 +17,6 @@ of the Rust Programming Language.
 **⚠ NOTES:**
 This is just a draft now.May be changed during  development.
 
-```rust
-+---DB
-    +-------------+-----------+
-    | disk_server | mem_table |
-    +-------------+-----------+
-+---disk_server
-    +-----+--------+
-    | WAL | levels |
-    +-----+--------+
-    +--levels
-       +-------+------+
-       | files | size |
-       +-------+------+
-       +-files
-         +---------+---------+
-         | min_key | max_key |
-         +---------+---------+
-+---mem_table
-    +---------------------------+-------------+
-    | BTreeSet<mem_table_entry> | size: usize |
-    +---------------------------+-------------+
-    +--mem_table_entry
-       +--------------+------------------------+-----------------+---------------+
-       | key: Vec<u8> | value: Option<Vec<u8>> | timestamp: u128 | deleted: bool |
-       +--------------+------------------------+-----------------+---------------+
-+---WAL
-    +----------------+------------------------+
-    |  path: PathBuf | file: BufWriter<File>  |
-    +----------------+------------------------+
-    +--wal_entry
-       In memory
-       +--------------+------------------------+-----------------+---------------+
-       | key: Vec<u8> | value: Option<Vec<u8>> | timestamp: u128 | deleted: bool |
-       +--------------+------------------------+-----------------+---------------+
-       In disk
-       +---------------+---------------+-----------------+-----+-------+-----------+       
-       | Key Size (8B) | Tombstone(1B) | Value Size (8B) | Key | Value | timestamp |
-       +---------------+---------------+-----------------+-----+-------+-----------+
-    +--wal_iterator
-       +-------------------------+
-       | reader: BufReader<File> |
-       +-------------------------+
-```
 
 ## Reference
 - [database-engine](https://github.com/adambcomer/database-engine)
