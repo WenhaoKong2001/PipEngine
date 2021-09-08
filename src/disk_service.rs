@@ -214,6 +214,7 @@ impl Iterator for DBFIterator {
         if self.reader.read_exact(&mut timestamp_buf).is_err() {
             return None;
         }
+
         let timestamp = u128::from_le_bytes(timestamp_buf);
         Some(MemTableEntry {
             key,
@@ -226,5 +227,15 @@ impl Iterator for DBFIterator {
 
 #[cfg ! (test)]
 mod test {
+    fn test_range(){
+        // TODO
+    }
 
+    fn test_new(){
+        // TODO
+    }
+
+    fn test_next(){
+        // TODO
+    }
 }
