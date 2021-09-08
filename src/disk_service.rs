@@ -14,9 +14,9 @@ pub struct DiskService {
     dir: PathBuf,
     files: Vec<FileService>,
 }
+
 //TODO range get compression
 impl DiskService {
-
     pub fn new(dir: &PathBuf) -> io::Result<DiskService> {
         fs::create_dir(dir);
         Ok(DiskService {
@@ -222,4 +222,9 @@ impl Iterator for DBFIterator {
             deleted,
         })
     }
+}
+
+#[cfg ! (test)]
+mod test {
+
 }
